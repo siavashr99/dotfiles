@@ -35,6 +35,6 @@ done
 
 # --- 5. dotfiles ---
 cd "$HOME/dotfiles"
-stow --restow nvim tmux
+stow --restow -t "$HOME" tmux
 
-echo "Done. Restore ~/.ssh and ~/.gnupg from your backup, then restart your shell."
+echo "Done. Restart your shell."
