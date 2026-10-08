@@ -16,18 +16,20 @@ fi
 # --- 2. python tooling: uv manages interpreters and venvs ---
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# --- 3. mount /data (only if not already in fstab) ---
+# 3. mount /data by label (skips if the installer already added it)
 if ! grep -qE '[[:space:]]/data[[:space:]]' /etc/fstab; then
   sudo mkdir -p /data
   echo 'LABEL=data /data ext4 defaults,noatime,nofail 0 2' | sudo tee -a /etc/fstab
   sudo systemctl daemon-reload && sudo mount -a
 fi
 
-# --- 4. link personal folders into home ---
-for d in Documents Pictures Projects Music Videos Downloads; do
+# 4. link personal folders into home
+for d in Documents Downloads Pictures Music Videos Desktop Games dev Projects; do
   [ -d "/data/$d" ] || continue
   [ -L "$HOME/$d" ] && continue
-  rmdir "$HOME/$d" 2>/dev/null || true
+  if [ -e "$HOME/$d" ]; then
+    rmdir "$HOME/$d" 2>/dev/null || { echo "SKIP $HOME/$d (not empty)"; continue; }
+  fi
   ln -s "/data/$d" "$HOME/$d"
 done
 
