@@ -6,7 +6,7 @@ if   command -v apt    >/dev/null; then
   sudo apt update
   sudo apt install -y git stow tmux neovim ripgrep fd-find build-essential curl unzip python3-dev
 elif command -v pacman >/dev/null; then
-  sudo pacman -Syu --needed --noconfirm git stow tmux neovim ripgrep fd base-devel curl unzip python
+  sudo pacman -Syu --needed --noconfirm git stow tmux neovim ripgrep fd base-devel curl unzip python openssh nodejs npm tree-sitter-cli pciutils
 elif command -v dnf    >/dev/null; then
   sudo dnf install -y git stow tmux neovim ripgrep fd-find @development-tools curl unzip python3-devel
 else
@@ -32,6 +32,21 @@ for d in Documents Downloads Pictures Music Videos Desktop Games dev Projects; d
   fi
   ln -s "/data/$d" "$HOME/$d"
 done
+
+# --- 4b. desktop (Arch Only: run with --desktop ---
+if [ "${1:-}" = "--desktop" ]; then
+  if command -v pacman >/dev/null; then
+    gpu_info=$(lspci | grep -E 'VGA|3D|DISPLAY' || true)
+    gpu_pkgs=""
+    if grep -qi 'AMD/ATI' <<<"$gpu_info"; then gpu_pkgs="vulkan-radeon"
+    elif grep -qi 'Intel' <<<"$gpu_info"; then gpu_pkgs="vulkan-intel"
+    else echo "NOTE: no AMD/Intel GPU detected; install gpu drivers manually"
+    fi
+    sudo pacman -S --needed --noconfirm hyprland ghostty wofi waybar $gpu_pkgs ttf-dejavu ttf-jetbrains-mono-nerd
+  else
+    echo "NOTE: --desktop is only set up for Arch; skipping"
+  fi
+fi
 
 # --- 5. dotfiles ---
 cd "$HOME/dotfiles"
