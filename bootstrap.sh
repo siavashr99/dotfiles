@@ -35,6 +35,6 @@ done
 
 # --- 5. dotfiles ---
 cd "$HOME/dotfiles"
-stow --restow -t "$HOME" tmux
+stow --restow --no-folding -t "$HOME" tmux hypr
 
 echo "Done. Restart your shell."
