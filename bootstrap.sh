@@ -4,11 +4,11 @@ set -euo pipefail
 # --- 1. detect package manager and install tools ---
 if   command -v apt    >/dev/null; then
   sudo apt update
-  sudo apt install -y git stow tmux neovim ripgrep fd-find build-essential curl unzip python3-dev
+  sudo apt install -y git stow tmux neovim ripgrep fd-find build-essential curl unzip python3-dev zsh
 elif command -v pacman >/dev/null; then
-  sudo pacman -Syu --needed --noconfirm git stow tmux neovim ripgrep fd base-devel curl unzip python openssh nodejs npm tree-sitter-cli pciutils
+  sudo pacman -Syu --needed --noconfirm git stow tmux neovim ripgrep fd base-devel curl unzip python openssh nodejs npm tree-sitter-cli pciutils zsh
 elif command -v dnf    >/dev/null; then
-  sudo dnf install -y git stow tmux neovim ripgrep fd-find @development-tools curl unzip python3-devel
+  sudo dnf install -y git stow tmux neovim ripgrep fd-find @development-tools curl unzip python3-devel zsh
 else
   echo "Unsupported distro"; exit 1
 fi
@@ -48,8 +48,16 @@ if [ "${1:-}" = "--desktop" ]; then
   fi
 fi
 
+# --- 4c. zsh + oh-my-zsh, login shell ---
+if command -v zsh >/dev/null; then
+  [ -d "$HOME/.oh-my-zsh" ] || RUNZSH=no CHSH=no KEEP_ZSHRC=yes \
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+  if [ -f "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then mv "$HOME/.zshrc" "$HOME/.zshrc.pre-stow"; fi
+  [ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ] || sudo chsh -s "$(command -v zsh)" "$USER"
+fi
+
 # --- 5. dotfiles ---
 cd "$HOME/dotfiles"
-stow --restow --no-folding -t "$HOME" tmux hypr ghostty
+stow --restow --no-folding -t "$HOME" tmux hypr ghostty zsh
 
 echo "Done. Restart your shell."
