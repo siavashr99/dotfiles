@@ -120,3 +120,4 @@ zstyle :compinstall filename '/home/halfbloodprince/.zshrc'
 autoload -Uz compinit
 compinit
 # End of lines added by compinstall
+export PATH="$HOME/.local/bin:$PATH"
