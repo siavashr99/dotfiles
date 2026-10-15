@@ -105,19 +105,4 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-
-# Lines configured by zsh-newuser-install
-HISTFILE=~/.histfile
-HISTSIZE=2000
-SAVEHIST=2000
-setopt autocd extendedglob nomatch notify
-unsetopt beep
-bindkey -v
-# End of lines configured by zsh-newuser-install
-# The following lines were added by compinstall
-zstyle :compinstall filename '/home/halfbloodprince/.zshrc'
-
-autoload -Uz compinit
-compinit
-# End of lines added by compinstall
 export PATH="$HOME/.local/bin:$PATH"
