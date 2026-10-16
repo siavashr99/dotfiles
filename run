@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+shopt -s nullglob
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+runs_dir="$script_dir/runs"
+export DEV_ENV="${DEV_ENV:-$script_dir}"
+
+usage() {
+    cat <<'EOF'
+Usage: run [--dry] [--batch] [--distro NAME] [SCRIPT]
+
+  SCRIPT          exact file name of one script in runs/common or runs/<distro>
+                  (without it, every script for the distro is run, asking first)
+  --dry           print what would run, run nothing
+  --batch         don't ask for permission before each script
+  --distro NAME   use runs/NAME instead of the detected distro
+  --help          show this help
+EOF
+}
+
+die() {
+    echo "ERROR: $1" >&2
+    exit "${2:-1}"
+}
+
+dry_run=0
+batch=0
+distro=""
+target=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry) dry_run=1 ;;
+        --batch) batch=1 ;;
+        --distro)
+            [[ $# -ge 2 ]] || die "--distro needs a name" 2
+            distro="$2"
+            shift
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        -*)
+            usage >&2
+            die "unknown flag: $1" 2
+            ;;
+        *)
+            [[ -z "$target" ]] || die "only one script name allowed (got '$target' and '$1')" 2
+            [[ "$1" != */* ]] || die "give the file name only, not a path: $1" 2
+            target="$1"
+            ;;
+    esac
+    shift
+done
+
+log() {
+    if [[ $dry_run == 1 ]]; then
+        echo "[DRY_RUN]: $1"
+    else
+        echo "$1"
+    fi
+}
+
+# Distro: the flag wins, otherwise read it from /etc/os-release.
+if [[ -n "$distro" ]]; then
+    if [[ ! -d "$runs_dir/$distro" ]]; then
+        available="$(find "$runs_dir" -mindepth 1 -maxdepth 1 -type d ! -name common -printf '%f ' 2>/dev/null || true)"
+        die "no folder runs/$distro (available: ${available:-none})"
+    fi
+else
+    distro="$(. /etc/os-release && echo "${ID:-unknown}")"
+fi
+
+dirs=("$runs_dir/common")
+if [[ -d "$runs_dir/$distro" ]]; then
+    dirs+=("$runs_dir/$distro")
+else
+    echo "NOTE: no runs/$distro folder, using common only" >&2
+fi
+
+list_available() {
+    local d f
+    for d in "${dirs[@]}"; do
+        for f in "$d"/*; do
+            if [[ -f "$f" ]]; then
+                printf '  %s  (%s)\n' "${f##*/}" "$(basename "$d")" >&2
+            fi
+        done
+    done
+}
+
+scripts=()
+
+if [[ -n "$target" ]]; then
+    matches=()
+    for d in "${dirs[@]}"; do
+        if [[ -f "$d/$target" ]]; then
+            matches+=("$d/$target")
+        fi
+    done
+
+    if [[ ${#matches[@]} -eq 0 ]]; then
+        echo "ERROR: no script named '$target' for distro '$distro'" >&2
+        echo "Available:" >&2
+        list_available
+        exit 1
+    fi
+    if [[ ${#matches[@]} -gt 1 ]]; then
+        die "'$target' exists in more than one folder: ${matches[*]}"
+    fi
+    if [[ ! -x "${matches[0]}" ]]; then
+        die "${matches[0]} is not executable (chmod +x it)"
+    fi
+    scripts=("${matches[0]}")
+else
+    for d in "${dirs[@]}"; do
+        for f in "$d"/*; do
+            [[ -f "$f" ]] || continue
+            if [[ -x "$f" ]]; then
+                scripts+=("$f")
+            else
+                echo "SKIP (not executable): $f" >&2
+            fi
+        done
+    done
+    [[ ${#scripts[@]} -gt 0 ]] || die "no scripts found for distro '$distro'"
+
+    if [[ $batch == 0 && $dry_run == 0 && ! -t 0 ]]; then
+        die "running the whole folder asks for permission but there is no terminal; use --batch"
+    fi
+fi
+
+ask() {
+    local reply
+    read -r -p "Run $1? [y/N] " reply
+    [[ "$reply" =~ ^[Yy]$ ]]
+}
+
+log "distro: $distro, DEV_ENV=$DEV_ENV"
+
+for s in "${scripts[@]}"; do
+    name="${s#"$runs_dir"/}"
+
+    if [[ $dry_run == 1 ]]; then
+        log "would run: $name"
+        continue
+    fi
+
+    if [[ -z "$target" && $batch == 0 ]]; then
+        if ! ask "$name"; then
+            echo "skipped: $name"
+            continue
+        fi
+    fi
+
+    echo "running: $name"
+    rc=0
+    "$s" || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        die "$name failed with exit code $rc" "$rc"
+    fi
+done

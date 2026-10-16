@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1. Mount /data by label if it isn't configured in /etc/fstab
+if ! grep -qE '^[^#].*[[:space:]]/data[[:space:]]' /etc/fstab; then
+    echo 'LABEL=data /data ext4 defaults,noatime,nofail 0 2' |
+        sudo tee -a /etc/fstab >/dev/null
+fi
+
+sudo mkdir -p /data
+sudo systemctl daemon-reload
+
+if ! mountpoint -q /data; then
+    sudo mount /data
+fi
+
+# Never link from an unmounted data partition.
+if ! mountpoint -q /data; then
+    echo "ERROR: /data is not mounted." >&2
+    exit 1
+fi
+
+# 2. Explicit allowlist of folders to symlink
+folders=(
+    Documents
+    Downloads
+    Pictures
+    Music
+    Videos
+    Desktop
+    Games
+    dev
+    Projects
+    .ssh
+    .gnupg
+)
+
+for d in "${folders[@]}"; do
+    src="/data/$d"
+    dest="$HOME/$d"
+
+    # Skip folders that don't exist on /data.
+    if [[ ! -d "$src" ]]; then
+        echo "SKIP: $src does not exist"
+        continue
+    fi
+
+    # Don't overwrite an existing symlink.
+    if [[ -L "$dest" ]]; then
+        echo "SKIP: $dest is already a symlink"
+        continue
+    fi
+
+    # Remove an empty dir the desktop created; rmdir refuses non-empty ones.
+    if [[ -d "$dest" ]]; then
+        rmdir "$dest" 2>/dev/null || true
+    fi
+
+    # Anything still there has content: leave it alone.
+    if [[ -e "$dest" ]]; then
+        echo "SKIP: $dest already exists; inspect it manually"
+        continue
+    fi
+
+    ln -s "$src" "$dest"
+    echo "LINK: $dest -> $src"
+done
