@@ -29,8 +29,7 @@ folders=(
     Videos
     Desktop
     Games
-    dev
-    Projects
+    Personal
     .ssh
     .gnupg
 )
